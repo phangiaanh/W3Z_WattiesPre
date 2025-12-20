@@ -178,7 +178,12 @@ class CombinedLoss(nn.Module):
             if 'pose' in smal_params and self.loss_weights.get('pose', 0) > 0:
                 gt_pose = smal_params['pose']  # (B, 105) axis-angle format
                 pred_pose = output['pred_pose']  # (B, 210) 6D format
-                has_pose = has_params.get('pose', torch.ones(len(pred_pose), device=pred_pose.device))
+                has_pose = has_params.get('pose', None)
+                if has_pose is None:
+                    has_pose = torch.ones(len(pred_pose), device=pred_pose.device, dtype=torch.bool)
+                else:
+                    # Ensure has_pose is on the same device as pred_pose
+                    has_pose = has_pose.to(device=pred_pose.device)
                 
                 # Convert both to rotation matrices for consistent loss computation
                 batch_size = pred_pose.shape[0]
@@ -209,7 +214,12 @@ class CombinedLoss(nn.Module):
             if 'betas' in smal_params and self.loss_weights.get('shape', 0) > 0:
                 gt_shape = smal_params['betas']
                 pred_shape = output['pred_shape']
-                has_shape = has_params.get('betas', torch.ones(len(pred_shape), device=pred_shape.device))
+                has_shape = has_params.get('betas', None)
+                if has_shape is None:
+                    has_shape = torch.ones(len(pred_shape), device=pred_shape.device, dtype=torch.bool)
+                else:
+                    # Ensure has_shape is on the same device as pred_shape
+                    has_shape = has_shape.to(device=pred_shape.device)
                 shape_loss = self.parameter_loss(pred_shape, gt_shape, has_shape)
                 losses['shape'] = shape_loss
                 total_loss += self.loss_weights['shape'] * shape_loss
