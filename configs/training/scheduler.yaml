@@ -2,5 +2,5 @@
 
 type: cosine
 # warmup_epochs: 5
-min_lr: 1e-6
+# min_lr: 1e-6
 
