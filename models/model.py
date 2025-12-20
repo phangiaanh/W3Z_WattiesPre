@@ -95,7 +95,12 @@ class CategoryRoutedModel(nn.Module):
         
         # Create category regressors
         regressor_cfg = cfg.get('regressors', {})
-        self.regressors = CategoryRegressors(regressor_cfg, num_categories=self.num_categories)
+        # Pass backbone embed_dim as context_dim for cross-attention
+        self.regressors = CategoryRegressors(
+            regressor_cfg, 
+            num_categories=self.num_categories,
+            context_dim=self.backbone.embed_dim
+        )
         
         # Create category router
         router_cfg = cfg.get('router', {})

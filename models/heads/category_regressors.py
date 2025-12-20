@@ -8,12 +8,13 @@ from ..utils.geometry import rot6d_to_rotmat, aa_to_rotmat
 class SingleRegressorHead(nn.Module):
     """Single regressor head using transformer decoder architecture."""
     
-    def __init__(self, cfg, output_dim, regressor_type='pose'):
+    def __init__(self, cfg, output_dim, regressor_type='pose', context_dim=None):
         """
         Args:
             cfg: Configuration dict with regressor parameters
             output_dim: Output dimension (e.g., npose for pose, 41 for shape, 3 for camera)
             regressor_type: Type of regressor ('pose', 'shape', 'camera')
+            context_dim: Dimension of context features (backbone embed_dim). If None, uses transformer_dim.
         """
         super().__init__()
         self.cfg = cfg
@@ -46,6 +47,10 @@ class SingleRegressorHead(nn.Module):
         
         # Override with any specific config values
         transformer_args.update(cfg.get('transformer_decoder', {}))
+        
+        # Set context_dim if provided, otherwise use transformer_dim as default
+        if context_dim is not None:
+            transformer_args['context_dim'] = context_dim
         
         self.transformer = TransformerDecoder(**transformer_args)
         dim = transformer_args['dim']
@@ -102,11 +107,12 @@ class SingleRegressorHead(nn.Module):
 class CategoryRegressors(nn.Module):
     """Category-specific regressors: 5 pose + 5 shape + 1 shared camera."""
     
-    def __init__(self, cfg, num_categories=5):
+    def __init__(self, cfg, num_categories=5, context_dim=None):
         """
         Args:
             cfg: Configuration dict
             num_categories: Number of categories (5)
+            context_dim: Dimension of context features (backbone embed_dim). If None, uses transformer_dim.
         """
         super().__init__()
         self.num_categories = num_categories
@@ -114,18 +120,18 @@ class CategoryRegressors(nn.Module):
         
         # Create 5 pose regressors (one per category)
         self.pose_regressors = nn.ModuleList([
-            SingleRegressorHead(cfg, output_dim=None, regressor_type='pose')
+            SingleRegressorHead(cfg, output_dim=None, regressor_type='pose', context_dim=context_dim)
             for _ in range(num_categories)
         ])
         
         # Create 5 shape regressors (one per category)
         self.shape_regressors = nn.ModuleList([
-            SingleRegressorHead(cfg, output_dim=None, regressor_type='shape')
+            SingleRegressorHead(cfg, output_dim=None, regressor_type='shape', context_dim=context_dim)
             for _ in range(num_categories)
         ])
         
         # Create 1 shared camera regressor
-        self.camera_regressor = SingleRegressorHead(cfg, output_dim=None, regressor_type='camera')
+        self.camera_regressor = SingleRegressorHead(cfg, output_dim=None, regressor_type='camera', context_dim=context_dim)
         
         # Get output dimensions
         joint_rep_type = cfg.get('joint_rep', '6d')
