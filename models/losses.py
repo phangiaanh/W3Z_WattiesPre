@@ -221,6 +221,16 @@ class CombinedLoss(nn.Module):
                 # Ensure gt_shape is on the same device as pred_shape
                 gt_shape = gt_shape.to(device=pred_shape.device)
                 
+                # Handle shape dimension mismatch: pad or truncate gt_shape to match pred_shape
+                if gt_shape.shape[1] < pred_shape.shape[1]:
+                    # Pad gt_shape with zeros to match pred_shape dimension
+                    padding_size = pred_shape.shape[1] - gt_shape.shape[1]
+                    padding = torch.zeros(gt_shape.shape[0], padding_size, device=gt_shape.device, dtype=gt_shape.dtype)
+                    gt_shape = torch.cat([gt_shape, padding], dim=1)
+                elif gt_shape.shape[1] > pred_shape.shape[1]:
+                    # Truncate gt_shape to match pred_shape dimension
+                    gt_shape = gt_shape[:, :pred_shape.shape[1]]
+                
                 has_shape = has_params.get('betas', None)
                 if has_shape is None:
                     has_shape = torch.ones(len(pred_shape), device=pred_shape.device, dtype=torch.bool)

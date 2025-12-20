@@ -294,17 +294,40 @@ class Animal3DDataset(Dataset):
             # Default: 35 joints * 3 = 105 (or adjust based on actual format)
             pose = np.zeros(105, dtype=np.float32)
         
-        # Process shape (use shape_extra if available, else shape)
-        # shape_extra has 21 floats, shape has 20 floats
-        shape = np.array(sample.get('shape_extra', sample.get('shape', [])), dtype=np.float32)
-        if len(shape) == 0:
-            # Default to 41 for SMAL (20 base + 21 extra)
-            shape = np.zeros(41, dtype=np.float32)
-        elif len(shape) == 20:
-            # If only base shape, pad to 41 with zeros
-            shape_padded = np.zeros(41, dtype=np.float32)
-            shape_padded[:20] = shape
-            shape = shape_padded
+        # Process shape (concatenate shape + shape_extra like AMR)
+        # shape has 20 floats, shape_extra has 21 floats, total should be 41
+        try:
+            shape_base = np.array(sample.get('shape', []), dtype=np.float32)
+            shape_extra = np.array(sample.get('shape_extra', []), dtype=np.float32)
+            if len(shape_base) > 0 and len(shape_extra) > 0:
+                # Concatenate: 20 + 21 = 41
+                shape = np.concatenate([shape_base, shape_extra], axis=0).astype(np.float32)
+            elif len(shape_base) > 0:
+                # Only base shape, pad to 41 with zeros
+                shape = np.zeros(41, dtype=np.float32)
+                shape[:len(shape_base)] = shape_base
+            elif len(shape_extra) > 0:
+                # Only shape_extra, pad to 41 with zeros
+                shape = np.zeros(41, dtype=np.float32)
+                shape[:len(shape_extra)] = shape_extra
+            else:
+                # Default to 41 for SMAL (20 base + 21 extra)
+                shape = np.zeros(41, dtype=np.float32)
+        except:
+            # Fallback: try to get shape_extra or shape
+            shape = np.array(sample.get('shape_extra', sample.get('shape', [])), dtype=np.float32)
+            if len(shape) == 0:
+                shape = np.zeros(41, dtype=np.float32)
+            elif len(shape) == 20:
+                # If only base shape, pad to 41 with zeros
+                shape_padded = np.zeros(41, dtype=np.float32)
+                shape_padded[:20] = shape
+                shape = shape_padded
+            elif len(shape) == 21:
+                # If only shape_extra, pad to 41 with zeros
+                shape_padded = np.zeros(41, dtype=np.float32)
+                shape_padded[:21] = shape
+                shape = shape_padded
         
         # Get focal length from metadata (per-sample or global)
         focal_length = self.metadata.get('flength', 1000.0)
