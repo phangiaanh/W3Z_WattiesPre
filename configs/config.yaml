@@ -20,7 +20,8 @@ model:
 
 # HuggingFace configuration
 huggingface:
-  repo_id: WatermelonAnh/WattiesMammals  # HuggingFace repository ID
+  dataset_repo_id: WatermelonAnh/WattiesMammals  # Repository for datasets
+  data_repo_id: WatermelonAnh/Watties_Data  # Repository for backbone weights and SMAL data
   token: null  # Set via HUGGINGFACE_TOKEN env var or here
   cache_dir: null  # Cache directory for downloaded files
 

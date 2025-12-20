@@ -17,7 +17,9 @@ def download_from_hf(
     Download a file from HuggingFace repository.
     
     Args:
-        repo_id: HuggingFace repository ID (e.g., "WatermelonAnh/WattiesMammals")
+        repo_id: HuggingFace repository ID 
+                 (e.g., "WatermelonAnh/WattiesMammals" for datasets,
+                  "WatermelonAnh/Watties_Data" for backbone/SMAL data)
         filename: Path to file in repository (e.g., "data/smal/my_smpl_00781_4_all.pkl")
         token: HuggingFace token (optional)
         cache_dir: Cache directory (optional)
@@ -51,8 +53,10 @@ def download_smal_model(
     """
     Download SMAL model file from HuggingFace.
     
+    Note: SMAL data is stored in WatermelonAnh/Watties_Data repository.
+    
     Args:
-        repo_id: HuggingFace repository ID
+        repo_id: HuggingFace repository ID (should be "WatermelonAnh/Watties_Data")
         filename: Path to SMAL model file in repository
         token: HuggingFace token
         cache_dir: Cache directory
@@ -72,8 +76,10 @@ def download_backbone_weights(
     """
     Download backbone weights from HuggingFace.
     
+    Note: Backbone weights are stored in WatermelonAnh/Watties_Data repository.
+    
     Args:
-        repo_id: HuggingFace repository ID
+        repo_id: HuggingFace repository ID (should be "WatermelonAnh/Watties_Data")
         filename: Path to backbone weights file in repository
         token: HuggingFace token
         cache_dir: Cache directory
@@ -93,8 +99,10 @@ def download_smal_prior(
     """
     Download SMAL prior file (shape or pose prior) from HuggingFace.
     
+    Note: SMAL prior data is stored in WatermelonAnh/Watties_Data repository.
+    
     Args:
-        repo_id: HuggingFace repository ID
+        repo_id: HuggingFace repository ID (should be "WatermelonAnh/Watties_Data")
         filename: Path to prior file in repository
         token: HuggingFace token
         cache_dir: Cache directory
@@ -110,7 +118,8 @@ def resolve_path(
     repo_id: Optional[str] = None,
     token: Optional[str] = None,
     cache_dir: Optional[str] = None,
-    is_hf_path: bool = False
+    is_hf_path: bool = False,
+    repo_type: str = "dataset"
 ) -> str:
     """
     Resolve a path - either local or HuggingFace.
@@ -118,9 +127,11 @@ def resolve_path(
     Args:
         path: File path (local or HuggingFace relative path)
         repo_id: HuggingFace repository ID (if path is from HF)
+                 Use "WatermelonAnh/Watties_Data" for backbone/SMAL data
         token: HuggingFace token
         cache_dir: Cache directory
         is_hf_path: Whether path is a HuggingFace path (not absolute/local)
+        repo_type: Repository type ("dataset" or "model")
     
     Returns:
         Resolved local path
@@ -131,7 +142,7 @@ def resolve_path(
     
     # If it's a HuggingFace path and repo_id is provided, download it
     if is_hf_path and repo_id is not None:
-        return download_from_hf(repo_id, path, token, cache_dir)
+        return download_from_hf(repo_id, path, token, cache_dir, repo_type=repo_type)
     
     # Otherwise, assume it's a relative local path
     return path

@@ -38,7 +38,8 @@ class CategoryRoutedModel(nn.Module):
         
         # Get HuggingFace config
         hf_cfg = cfg.get('huggingface', {})
-        hf_repo_id = hf_cfg.get('repo_id', None)
+        # Backbone and SMAL data are stored in WatermelonAnh/Watties_Data
+        hf_data_repo_id = hf_cfg.get('data_repo_id', 'WatermelonAnh/Watties_Data')
         hf_token = hf_cfg.get('token', os.getenv('HUGGINGFACE_TOKEN', None))
         cache_dir = hf_cfg.get('cache_dir', None)
         
@@ -50,10 +51,11 @@ class CategoryRoutedModel(nn.Module):
         pretrained_path = None
         if pretrained_weights:
             # Resolve path (local or HuggingFace)
+            # Backbone weights are stored in WatermelonAnh/Watties_Data
             is_hf_path = not os.path.isabs(pretrained_weights) and not os.path.exists(pretrained_weights)
             pretrained_path = resolve_path(
                 pretrained_weights,
-                repo_id=hf_repo_id,
+                repo_id=hf_data_repo_id,
                 token=hf_token,
                 cache_dir=cache_dir,
                 is_hf_path=is_hf_path
@@ -104,10 +106,11 @@ class CategoryRoutedModel(nn.Module):
         smal_model_path = smal_cfg.get('model_path', None)
         if smal_model_path:
             # Resolve SMAL model path (local or HuggingFace)
+            # SMAL data is stored in WatermelonAnh/Watties_Data
             is_hf_path = not os.path.isabs(smal_model_path) and not os.path.exists(smal_model_path)
             smal_path = resolve_path(
                 smal_model_path,
-                repo_id=hf_repo_id,
+                repo_id=hf_data_repo_id,
                 token=hf_token,
                 cache_dir=cache_dir,
                 is_hf_path=is_hf_path

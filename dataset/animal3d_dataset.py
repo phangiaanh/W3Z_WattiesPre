@@ -57,6 +57,7 @@ class Animal3DDataset(Dataset):
         self.std = std if std is not None else [0.229, 0.224, 0.225]
         
         # Load dataset from HuggingFace
+        # Only datasets are retrieved from WatermelonAnh/WattiesMammals
         repo_id = "WatermelonAnh/WattiesMammals"
         data_path = f"data/animal3d/{split}.json"
         # data_path = f"{split}.json"
