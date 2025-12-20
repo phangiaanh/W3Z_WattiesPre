@@ -139,7 +139,7 @@ class CategoryRoutedModel(nn.Module):
         Args:
             batch: Dictionary containing:
                 - img: (B, 3, H, W) input images
-                - category: (B,) ground truth category indices (optional, for training)
+                - supercategory: (B,) ground truth supercategory indices (optional, for training)
                 - focal_length: (B, 2) focal lengths (optional)
             training: Whether in training mode
         
@@ -159,8 +159,8 @@ class CategoryRoutedModel(nn.Module):
         batch_size = img.shape[0]
         device = img.device
         
-        # Get ground truth category if available
-        gt_category = batch.get('category', None)
+        # Get ground truth supercategory if available
+        gt_category = batch.get('supercategory', None)
         
         # Forward through backbone
         # Note: Original AniMer crops image, but we'll use full image for now

@@ -147,8 +147,8 @@ class CombinedLoss(nn.Module):
         total_loss = 0.0
         
         # Classification loss
-        if 'category' in batch and self.loss_weights.get('classification', 0) > 0:
-            cls_loss = self.classification_loss(output['category_logits'], batch['category'])
+        if 'supercategory' in batch and self.loss_weights.get('classification', 0) > 0:
+            cls_loss = self.classification_loss(output['category_logits'], batch['supercategory'])
             losses['classification'] = cls_loss
             total_loss += self.loss_weights['classification'] * cls_loss
         
