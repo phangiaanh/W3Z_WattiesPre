@@ -18,6 +18,7 @@ from utils.metrics import Evaluator
 from utils.logger import TrainingLogger
 from dataset import Animal3DDataset
 
+torch.cuda.empty_cache()
 
 def setup_device(cfg):
     """Setup device."""
