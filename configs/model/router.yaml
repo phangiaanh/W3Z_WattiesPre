@@ -1,0 +1,4 @@
+# @package _global_.model.router
+
+use_gt_for_routing: true
+

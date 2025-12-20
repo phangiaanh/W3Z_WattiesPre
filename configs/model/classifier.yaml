@@ -1,0 +1,7 @@
+# @package _global_.model.classifier
+
+input_dim: 256
+hidden_dim: 512
+num_categories: 5
+dropout: 0.1
+

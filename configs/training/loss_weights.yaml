@@ -1,0 +1,9 @@
+# @package _global_.training.loss_weights
+
+classification: 1.0
+keypoints_2d: 1.0
+keypoints_3d: 1.0
+pose: 0.1
+shape: 0.1
+camera: 0.1
+

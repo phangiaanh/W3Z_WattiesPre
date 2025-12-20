@@ -1,0 +1,8 @@
+# @package _global_.evaluation
+
+metrics:
+  image_size: 256
+  pelvis_ind: 0
+  pck_thresholds: [0.1, 0.15]
+  pck_head_threshold: 0.5
+

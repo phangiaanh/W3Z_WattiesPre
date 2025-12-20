@@ -1,0 +1,23 @@
+# @package _global_.model.regressors
+
+# Joint representation
+joint_rep: 6d  # '6d' or 'aa'
+num_joints: 34
+shape_dim: 41
+
+# Transformer decoder config
+transformer_dim: 1024
+transformer_depth: 1
+transformer_heads: 8
+transformer_mlp_dim: 2048
+transformer_dim_head: 64
+transformer_dropout: 0.1
+transformer_emb_dropout: 0.0
+transformer_input: zero  # 'zero' or 'mean_shape'
+
+# IEF iterations
+ief_iters: 3
+
+# Initialization
+init_decoder_xavier: false
+

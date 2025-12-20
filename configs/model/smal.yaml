@@ -1,0 +1,12 @@
+# @package _global_.model.smal
+
+# SMAL model path (can be local path or HuggingFace relative path)
+model_path: data/smal/my_smpl_00781_4_all.pkl
+
+# SMAL prior paths (optional, for prior losses)
+shape_prior_path: null  # data/smal/my_smpl_data_00781_4_all.pkl
+pose_prior_path: null  # data/smal/walking_toy_symmetric_pose_prior_with_cov_35parts.pkl
+
+# Number of joints in SMAL model
+num_joints: 34
+
