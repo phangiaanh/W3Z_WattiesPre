@@ -178,14 +178,19 @@ def compute_pa_mpvpe(pred_vertices: torch.Tensor, gt_vertices: torch.Tensor) -> 
 class Evaluator:
     """Evaluator for computing all specified metrics."""
     
-    def __init__(self, image_size: int = 256, pelvis_ind: int = 0):
+    def __init__(self, image_size: int = 256, pelvis_ind: int = 0, 
+                 pck_thresholds: List[float] = None, pck_head_threshold: float = 0.5):
         """
         Args:
             image_size: Image size for normalization
             pelvis_ind: Index of pelvis joint for alignment
+            pck_thresholds: List of PCK thresholds (e.g., [0.1, 0.15])
+            pck_head_threshold: Threshold for PCK@H (head-normalized PCK)
         """
         self.image_size = image_size
         self.pelvis_ind = pelvis_ind
+        self.pck_thresholds = pck_thresholds if pck_thresholds is not None else [0.1, 0.15]
+        self.pck_head_threshold = pck_head_threshold
     
     def evaluate(self, output: Dict, batch: Dict) -> Dict[str, float]:
         """
@@ -206,20 +211,18 @@ class Evaluator:
             gt_kp2d = batch['keypoints_2d']
             mask = batch.get('mask', None)
             
-            # P@0.1
-            metrics['P@0.1'] = compute_pck_at_threshold(
-                pred_kp2d, gt_kp2d, threshold=0.1, image_size=self.image_size, mask=mask
-            )
-            
-            # P@0.15
-            metrics['P@0.15'] = compute_pck_at_threshold(
-                pred_kp2d, gt_kp2d, threshold=0.15, image_size=self.image_size, mask=mask
-            )
+            # PCK at configured thresholds
+            for threshold in self.pck_thresholds:
+                metric_name = f'P@{threshold}'
+                metrics[metric_name] = compute_pck_at_threshold(
+                    pred_kp2d, gt_kp2d, threshold=threshold, image_size=self.image_size, mask=mask
+                )
             
             # P@H (PCK@HTH) - requires mask
             if mask is not None:
                 metrics['P@H'] = compute_pck_at_head(
-                    pred_kp2d, gt_kp2d, threshold=0.5, mask=mask, image_size=self.image_size
+                    pred_kp2d, gt_kp2d, threshold=self.pck_head_threshold, 
+                    mask=mask, image_size=self.image_size
                 )
         
         # 3D keypoint metrics
