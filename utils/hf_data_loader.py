@@ -32,9 +32,9 @@ def download_from_hf(
         local_path = hf_hub_download(
             repo_id=repo_id,
             filename=filename,
-            token=token,
+            # token=token,
             cache_dir=cache_dir,
-            repo_type=repo_type
+            # repo_type=repo_type
         )
         return local_path
     except Exception as e:
