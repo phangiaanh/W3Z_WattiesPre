@@ -54,6 +54,25 @@ def create_model(cfg, device):
 def create_dataloader(cfg, split='train'):
     """Create dataloader."""
     dataset_cfg = OmegaConf.to_container(cfg.data.dataset, resolve=True)
+    
+    # Resolve token with priority: command-line > huggingface.token > data.dataset.token > env var
+    token = None
+    if 'huggingface' in cfg and cfg.huggingface.get('token') is not None:
+        token = cfg.huggingface.token
+    elif dataset_cfg.get('token') is not None:
+        token = dataset_cfg['token']
+    else:
+        token = os.getenv('HUGGINGFACE_TOKEN', None)
+    
+    # Override token in dataset config if resolved
+    if token is not None:
+        dataset_cfg['token'] = token
+    
+    # Also pass cache_dir from huggingface config if available
+    hf_cache_dir = cfg.get('huggingface', {}).get('cache_dir', None)
+    if hf_cache_dir is not None and dataset_cfg.get('cache_dir') is None:
+        dataset_cfg['cache_dir'] = hf_cache_dir
+    
     dataset = Animal3DDataset(split=split, **dataset_cfg)
     
     dataloader = DataLoader(
@@ -255,13 +274,48 @@ def load_checkpoint(
         }
 
 
+# Parse --token argument from command line before Hydra processes it
+# This must be done at module level before @hydra.main decorator is applied
+_CLI_TOKEN = None
+if '--token' in sys.argv:
+    token_idx = sys.argv.index('--token')
+    if token_idx + 1 < len(sys.argv):
+        _CLI_TOKEN = sys.argv[token_idx + 1]
+        # Remove --token and its value from sys.argv so Hydra doesn't see it
+        sys.argv.pop(token_idx)
+        sys.argv.pop(token_idx)  # Remove the value (now at token_idx after first pop)
+
+
 @hydra.main(version_base=None, config_path="configs", config_name="config")
 def main(cfg: DictConfig):
     """Main training function."""
+    # Use token parsed from command line if provided
+    cli_token = _CLI_TOKEN
+    
+    # Override config with command-line token if provided
+    if cli_token is not None:
+        OmegaConf.set_struct(cfg, False)  # Allow modifications
+        if 'huggingface' not in cfg:
+            cfg['huggingface'] = {}
+        cfg.huggingface.token = cli_token
+        if 'data' not in cfg or 'dataset' not in cfg.data:
+            if 'data' not in cfg:
+                cfg['data'] = {}
+            if 'dataset' not in cfg.data:
+                cfg.data['dataset'] = {}
+        cfg.data.dataset.token = cli_token
+        OmegaConf.set_struct(cfg, True)  # Re-enable struct mode
+    
     print("=" * 60)
     print("Category-Routed Multi-Regressor Model Training")
     print("=" * 60)
-    print(f"Config:\n{OmegaConf.to_yaml(cfg)}")
+    # Don't print full config to avoid exposing token - print masked version
+    cfg_safe = OmegaConf.create(OmegaConf.to_container(cfg, resolve=True))
+    if 'huggingface' in cfg_safe and 'token' in cfg_safe.huggingface and cfg_safe.huggingface.token:
+        cfg_safe.huggingface.token = '***'
+    if 'data' in cfg_safe and 'dataset' in cfg_safe.data and 'token' in cfg_safe.data.dataset and cfg_safe.data.dataset.token:
+        cfg_safe.data.dataset.token = '***'
+    print(f"Config:\n{OmegaConf.to_yaml(cfg_safe)}")
     
     # Set random seed
     if cfg.seed is not None:

@@ -65,7 +65,7 @@ class Animal3DDataset(Dataset):
         self.repo_id = repo_id
         self.token = token
         print(f"Repo ID: {repo_id}")
-        print(f"Token: {token}")
+        print(f"Token: {'***' if token else None}")  # Mask token for security
         print(f"Data path: {data_path}")
         print(f"Cache dir: {cache_dir}")
         
@@ -278,10 +278,45 @@ class Animal3DDataset(Dataset):
         # Normalize keypoints based on original image size
         keypoints_2d_normalized = normalize_keypoints_2d(keypoint_2d, original_size)
         
-        # Process 3D keypoints
+        # Process 3D keypoints - ensure (N, 4) format with confidence
         keypoint_3d = np.array(sample.get('keypoint_3d', []), dtype=np.float32)
         if len(keypoint_3d) == 0:
-            keypoint_3d = np.zeros((26, 3), dtype=np.float32)
+            keypoint_3d = np.zeros((26, 4), dtype=np.float32)
+        elif keypoint_3d.shape[1] == 3:
+            # Add confidence dimension if missing
+            confidence = np.ones((keypoint_3d.shape[0], 1), dtype=np.float32)
+            keypoint_3d = np.concatenate([keypoint_3d, confidence], axis=1)
+        
+        # Process pose (105 floats = 35 joints * 3 for axis-angle or similar)
+        pose = np.array(sample.get('pose', []), dtype=np.float32)
+        if len(pose) == 0:
+            # Default: 35 joints * 3 = 105 (or adjust based on actual format)
+            pose = np.zeros(105, dtype=np.float32)
+        
+        # Process shape (use shape_extra if available, else shape)
+        # shape_extra has 21 floats, shape has 20 floats
+        shape = np.array(sample.get('shape_extra', sample.get('shape', [])), dtype=np.float32)
+        if len(shape) == 0:
+            # Default to 41 for SMAL (20 base + 21 extra)
+            shape = np.zeros(41, dtype=np.float32)
+        elif len(shape) == 20:
+            # If only base shape, pad to 41 with zeros
+            shape_padded = np.zeros(41, dtype=np.float32)
+            shape_padded[:20] = shape
+            shape = shape_padded
+        
+        # Get focal length from metadata (per-sample or global)
+        focal_length = self.metadata.get('flength', 1000.0)
+        
+        # Process camera parameters
+        # Camera format: [scale, tx, ty] typically
+        # Try to get from sample, otherwise use default
+        trans = np.array(sample.get('trans', [0.0, 0.0, 0.0]), dtype=np.float32)
+        if len(trans) == 3:
+            # Construct camera from translation (scale=1.0, tx=trans[0], ty=trans[1])
+            camera = np.array([1.0, trans[0], trans[1]], dtype=np.float32)
+        else:
+            camera = np.array([1.0, 0.0, 0.0], dtype=np.float32)
         
         # Bounding box
         bbox = np.array(sample.get('bbox', [0, 0, 0, 0]), dtype=np.float32)
@@ -294,11 +329,24 @@ class Animal3DDataset(Dataset):
             'img': img_tensor,
             'mask': mask_tensor,
             'keypoints_2d': torch.from_numpy(keypoints_2d_normalized).float(),
-            'keypoints_3d': torch.from_numpy(keypoint_3d).float(),
+            'keypoints_3d': torch.from_numpy(keypoint_3d).float(),  # (N, 4) with confidence
             'bbox': torch.from_numpy(bbox).float(),
             'category': torch.tensor(category, dtype=torch.long),
             'supercategory': torch.tensor(supercategory, dtype=torch.long),
             'img_path': img_path,
             'original_size': torch.tensor(original_size, dtype=torch.int32),
+            # Add required fields for loss computation
+            'pose': torch.from_numpy(pose).float(),
+            'shape': torch.from_numpy(shape).float(),
+            'focal_length': torch.tensor([focal_length, focal_length], dtype=torch.float32),
+            'camera': torch.from_numpy(camera).float(),
+            'smal_params': {
+                'pose': torch.from_numpy(pose).float(),
+                'betas': torch.from_numpy(shape).float(),
+            },
+            'has_smal_params': {
+                'pose': torch.ones(1, dtype=torch.bool),
+                'betas': torch.ones(1, dtype=torch.bool),
+            }
         }
 
