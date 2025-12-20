@@ -165,11 +165,15 @@ def image_to_tensor(img: np.ndarray) -> torch.Tensor:
         img: Image array (H, W, C)
         
     Returns:
-        Tensor (C, H, W)
+        Tensor (C, H, W) with dtype float32
     """
     if len(img.shape) == 2:
         # Grayscale image
         img = img[..., None]
     img = np.transpose(img, (2, 0, 1))  # HWC -> CHW
-    return to_tensor(img)
+    tensor = to_tensor(img)
+    # Ensure float32 dtype to match model parameters
+    if tensor.dtype != torch.float32:
+        tensor = tensor.float()
+    return tensor
 
