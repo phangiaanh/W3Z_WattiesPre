@@ -104,7 +104,8 @@ class ParameterLoss(nn.Module):
             loss: scalar parameter loss
         """
         if has_param is not None:
-            mask = has_param.type(pred_param.dtype).view(-1, *([1] * (len(pred_param.shape) - 1)))
+            # Ensure mask is on the same device and dtype as pred_param
+            mask = has_param.to(device=pred_param.device, dtype=pred_param.dtype).view(-1, *([1] * (len(pred_param.shape) - 1)))
             loss = (mask * self.loss_fn(pred_param, gt_param)).sum()
         else:
             loss = self.loss_fn(pred_param, gt_param).sum()
@@ -176,8 +177,11 @@ class CombinedLoss(nn.Module):
             
             # Pose loss
             if 'pose' in smal_params and self.loss_weights.get('pose', 0) > 0:
-                gt_pose = smal_params['pose']  # (B, 105) axis-angle format
                 pred_pose = output['pred_pose']  # (B, 210) 6D format
+                gt_pose = smal_params['pose']  # (B, 105) axis-angle format
+                # Ensure gt_pose is on the same device as pred_pose
+                gt_pose = gt_pose.to(device=pred_pose.device)
+                
                 has_pose = has_params.get('pose', None)
                 if has_pose is None:
                     has_pose = torch.ones(len(pred_pose), device=pred_pose.device, dtype=torch.bool)
@@ -212,8 +216,11 @@ class CombinedLoss(nn.Module):
             
             # Shape loss
             if 'betas' in smal_params and self.loss_weights.get('shape', 0) > 0:
-                gt_shape = smal_params['betas']
                 pred_shape = output['pred_shape']
+                gt_shape = smal_params['betas']
+                # Ensure gt_shape is on the same device as pred_shape
+                gt_shape = gt_shape.to(device=pred_shape.device)
+                
                 has_shape = has_params.get('betas', None)
                 if has_shape is None:
                     has_shape = torch.ones(len(pred_shape), device=pred_shape.device, dtype=torch.bool)
