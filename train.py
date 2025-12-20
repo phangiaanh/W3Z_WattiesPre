@@ -346,7 +346,9 @@ def main(cfg: DictConfig):
     
     # Create loss function
     loss_weights = OmegaConf.to_container(cfg.training.get('loss_weights', {}), resolve=True)
-    criterion = CombinedLoss(loss_weights)
+    joint_rep_type = cfg.model.regressors.get('joint_rep', '6d')
+    num_joints = cfg.model.regressors.get('num_joints', 34)
+    criterion = CombinedLoss(loss_weights, joint_rep_type=joint_rep_type, num_joints=num_joints)
     
     # Create evaluator
     eval_cfg = OmegaConf.to_container(cfg.evaluation.metrics, resolve=True)

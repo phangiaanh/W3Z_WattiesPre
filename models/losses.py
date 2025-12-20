@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from models.utils.geometry import rot6d_to_rotmat, aa_to_rotmat
 
 
 class ClassificationLoss(nn.Module):
@@ -113,7 +114,7 @@ class ParameterLoss(nn.Module):
 class CombinedLoss(nn.Module):
     """Combined loss for the full model."""
     
-    def __init__(self, loss_weights: dict):
+    def __init__(self, loss_weights: dict, joint_rep_type: str = '6d', num_joints: int = 34):
         """
         Args:
             loss_weights: Dictionary with loss weights:
@@ -123,9 +124,13 @@ class CombinedLoss(nn.Module):
                 - pose: weight for pose parameter loss
                 - shape: weight for shape parameter loss
                 - camera: weight for camera parameter loss
+            joint_rep_type: Joint representation type ('6d' or 'aa')
+            num_joints: Number of joints (excluding global orientation)
         """
         super().__init__()
         self.loss_weights = loss_weights
+        self.joint_rep_type = joint_rep_type
+        self.num_joints = num_joints
         
         self.classification_loss = ClassificationLoss()
         self.keypoint_2d_loss = Keypoint2DLoss(loss_type='l1')
@@ -171,11 +176,32 @@ class CombinedLoss(nn.Module):
             
             # Pose loss
             if 'pose' in smal_params and self.loss_weights.get('pose', 0) > 0:
-                # Convert pose to same format
-                gt_pose = smal_params['pose']
-                pred_pose = output['pred_pose']
+                gt_pose = smal_params['pose']  # (B, 105) axis-angle format
+                pred_pose = output['pred_pose']  # (B, 210) 6D format
                 has_pose = has_params.get('pose', torch.ones(len(pred_pose), device=pred_pose.device))
-                pose_loss = self.parameter_loss(pred_pose, gt_pose, has_pose)
+                
+                # Convert both to rotation matrices for consistent loss computation
+                batch_size = pred_pose.shape[0]
+                num_joints_total = self.num_joints + 1  # +1 for global orientation
+                
+                # Convert predicted 6D pose to rotation matrices
+                # Reshape: (B, 210) -> (B, 35, 6) -> (B*35, 6) -> (B*35, 3, 3)
+                pred_pose_reshaped = pred_pose.view(batch_size, num_joints_total, 6)
+                pred_pose_flat = pred_pose_reshaped.view(-1, 6)
+                pred_rotmats = rot6d_to_rotmat(pred_pose_flat)  # (B*35, 3, 3)
+                
+                # Convert ground truth axis-angle pose to rotation matrices
+                # Reshape: (B, 105) -> (B, 35, 3) -> (B*35, 3) -> (B*35, 3, 3)
+                gt_pose_reshaped = gt_pose.view(batch_size, num_joints_total, 3)
+                gt_pose_flat = gt_pose_reshaped.view(-1, 3)
+                gt_rotmats = aa_to_rotmat(gt_pose_flat)  # (B*35, 3, 3)
+                
+                # Flatten rotation matrices for loss computation: (B, 35, 9)
+                pred_rotmats_flat = pred_rotmats.view(batch_size, num_joints_total, 9)
+                gt_rotmats_flat = gt_rotmats.view(batch_size, num_joints_total, 9)
+                
+                # Compute MSE loss on rotation matrices (mask is handled by parameter_loss)
+                pose_loss = self.parameter_loss(pred_rotmats_flat, gt_rotmats_flat, has_pose)
                 losses['pose'] = pose_loss
                 total_loss += self.loss_weights['pose'] * pose_loss
             
