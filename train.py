@@ -348,7 +348,7 @@ def main(cfg: DictConfig):
     train_loader = create_dataloader(cfg, split='train')
     val_loader = None
     try:
-        val_loader = create_dataloader(cfg, split='val')
+        val_loader = create_dataloader(cfg, split='test')
         print(f"Val samples: {len(val_loader.dataset)}")
     except (ValueError, RuntimeError, KeyError) as e:
         print(f"Warning: Could not create validation dataloader: {e}")
