@@ -184,22 +184,18 @@ def save_checkpoint(
     if cfg is not None:
         checkpoint['config'] = OmegaConf.to_container(cfg, resolve=True)
     
-    # Save regular checkpoint
-    checkpoint_path = os.path.join(checkpoint_dir, f'checkpoint_epoch_{epoch+1}.pt')
-    torch.save(checkpoint, checkpoint_path)
-    
-    # Save latest checkpoint
+    # Save latest checkpoint (always)
     if is_latest:
         latest_path = os.path.join(checkpoint_dir, 'latest_checkpoint.pt')
         torch.save(checkpoint, latest_path)
     
-    # Save best model
+    # Save best model (only when it improves)
     if is_best:
         best_path = os.path.join(checkpoint_dir, 'best_model.pt')
         torch.save(checkpoint, best_path)
         print(f"Saved best model to {best_path}")
     
-    return checkpoint_path
+    return latest_path if is_latest else (best_path if is_best else None)
 
 
 def load_checkpoint(
@@ -389,7 +385,7 @@ def main(cfg: DictConfig):
     # Checkpoint configuration
     checkpoint_cfg = cfg.get('checkpoint', {})
     checkpoint_dir = cfg.paths.checkpoint_dir
-    save_checkpoint_every = checkpoint_cfg.get('save_checkpoint_every', 10)
+    # Remove save_checkpoint_every - we only save latest and best
     save_best_model = checkpoint_cfg.get('save_best_model', True)
     resume_from = checkpoint_cfg.get('resume_from', None)
     best_metric = checkpoint_cfg.get('best_metric', 'val_loss')
@@ -607,30 +603,25 @@ def main(cfg: DictConfig):
             logger.log_convergence_stats(
                 epoch=epoch,
                 best_metric_value=best_metric_value,
-                metric_trend=metric_trend
+                metric_trend=metric_trend,
+                epoch_val_metrics=val_metrics
             )
             
-            # Save checkpoints
-            # Save regular checkpoint every N epochs
-            save_regular = (epoch + 1) % save_checkpoint_every == 0
-            # Save latest checkpoint always
-            is_latest = True
-            
-            if save_regular or is_best or is_latest:
-                save_checkpoint(
-                    checkpoint_dir=checkpoint_dir,
-                    epoch=epoch,
-                    model=model,
-                    optimizer=optimizer,
-                    scheduler=scheduler,
-                    best_metric_value=best_metric_value,
-                    train_loss=train_loss_total,
-                    val_loss=val_loss_total,
-                    val_metrics=val_metrics,
-                    cfg=cfg,
-                    is_best=is_best and save_best_model,
-                    is_latest=is_latest
-                )
+            # Save checkpoints - only latest and best
+            save_checkpoint(
+                checkpoint_dir=checkpoint_dir,
+                epoch=epoch,
+                model=model,
+                optimizer=optimizer,
+                scheduler=scheduler,
+                best_metric_value=best_metric_value,
+                train_loss=train_loss_total,
+                val_loss=val_loss_total,
+                val_metrics=val_metrics,
+                cfg=cfg,
+                is_best=is_best and save_best_model,
+                is_latest=True  # Always save latest checkpoint
+            )
         else:
             # No validation, just print training loss
             print(f"\nEpoch {epoch+1}/{cfg.training.num_epochs}")
@@ -640,28 +631,25 @@ def main(cfg: DictConfig):
             logger.log_convergence_stats(
                 epoch=epoch,
                 best_metric_value=best_metric_value,
-                metric_trend='stable'
+                metric_trend='stable',
+                epoch_val_metrics={}
             )
             
-            # Save checkpoints even without validation
-            save_regular = (epoch + 1) % save_checkpoint_every == 0
-            is_latest = True
-            
-            if save_regular or is_latest:
-                save_checkpoint(
-                    checkpoint_dir=checkpoint_dir,
-                    epoch=epoch,
-                    model=model,
-                    optimizer=optimizer,
-                    scheduler=scheduler,
-                    best_metric_value=best_metric_value,
-                    train_loss=train_loss_total,
-                    val_loss=None,
-                    val_metrics={},
-                    cfg=cfg,
-                    is_best=False,
-                    is_latest=is_latest
-                )
+            # Save checkpoints - only latest (no best without validation)
+            save_checkpoint(
+                checkpoint_dir=checkpoint_dir,
+                epoch=epoch,
+                model=model,
+                optimizer=optimizer,
+                scheduler=scheduler,
+                best_metric_value=best_metric_value,
+                train_loss=train_loss_total,
+                val_loss=None,
+                val_metrics={},
+                cfg=cfg,
+                is_best=False,
+                is_latest=True  # Always save latest checkpoint
+            )
     
     print("\nTraining completed!")
 

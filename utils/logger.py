@@ -172,11 +172,10 @@ class TrainingLogger:
             metrics: Dictionary of validation metrics
             iteration_time: Time taken for this iteration
         """
-        # if self.global_iteration % self.log_iteration_every != 0:
+        # Always log validation iterations (remove the skip check)
+        # if self.val_iteration % self.log_iteration_every != 0:
+        #     self.val_iteration += 1
         #     return
-        if self.val_iteration % self.log_iteration_every != 0:
-            self.val_iteration += 1
-            return
         
         row = [epoch, self.global_iteration, batch_idx, losses.get('total', 0.0)]
         row.append(losses.get('classification', 0.0))
@@ -204,12 +203,15 @@ class TrainingLogger:
         self.epoch_stats['val_losses'].append(losses.get('total', 0.0))
         for metric_name, metric_value in metrics.items():
             self.epoch_stats['val_metrics'][metric_name].append(metric_value)
+        
+        self.val_iteration += 1
     
     def log_convergence_stats(
         self,
         epoch: int,
         best_metric_value: float,
-        metric_trend: str = 'stable'
+        metric_trend: str = 'stable',
+        epoch_val_metrics: Optional[Dict[str, float]] = None
     ):
         """
         Log convergence statistics at end of epoch.
@@ -218,6 +220,7 @@ class TrainingLogger:
             epoch: Current epoch
             best_metric_value: Best metric value so far
             metric_trend: Trend description ('improving', 'stable', 'degrading')
+            epoch_val_metrics: Optional epoch-averaged validation metrics
         """
         # Compute averages
         avg_lr = np.mean(self.epoch_stats['lr_values']) if self.epoch_stats['lr_values'] else 0.0
@@ -225,13 +228,17 @@ class TrainingLogger:
         avg_train_loss = np.mean(self.epoch_stats['train_losses']) if self.epoch_stats['train_losses'] else 0.0
         avg_val_loss = np.mean(self.epoch_stats['val_losses']) if self.epoch_stats['val_losses'] else 0.0
         
-        # Compute average metrics
-        avg_metrics = {}
-        for metric_name in ['P@0.1', 'P@0.15', 'P@H', 'PAJ', 'PAV']:
-            if metric_name in self.epoch_stats['val_metrics']:
-                avg_metrics[metric_name] = np.mean(self.epoch_stats['val_metrics'][metric_name])
-            else:
-                avg_metrics[metric_name] = 0.0
+        # Use provided epoch-averaged metrics if available, otherwise compute from per-batch metrics
+        if epoch_val_metrics is not None:
+            avg_metrics = epoch_val_metrics
+        else:
+            # Fallback: compute from per-batch metrics
+            avg_metrics = {}
+            for metric_name in ['P@0.1', 'P@0.15', 'P@H', 'PAJ', 'PAV']:
+                if metric_name in self.epoch_stats['val_metrics']:
+                    avg_metrics[metric_name] = np.mean(self.epoch_stats['val_metrics'][metric_name])
+                else:
+                    avg_metrics[metric_name] = 0.0
         
         # Write to CSV
         row = [epoch, avg_lr, avg_grad_norm, avg_train_loss, avg_val_loss, best_metric_value, metric_trend]
