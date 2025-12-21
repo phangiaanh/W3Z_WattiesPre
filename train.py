@@ -346,11 +346,17 @@ def main(cfg: DictConfig):
     # Create dataloaders
     print("\nCreating dataloaders...")
     train_loader = create_dataloader(cfg, split='train')
-    val_loader = create_dataloader(cfg, split='val') if hasattr(cfg.data.dataset, 'split') else None
-    print(f"Train samples: {len(train_loader.dataset)}")
-    if val_loader:
+    val_loader = None
+    try:
+        val_loader = create_dataloader(cfg, split='val')
         print(f"Val samples: {len(val_loader.dataset)}")
-    else:
+    except (ValueError, RuntimeError, KeyError) as e:
+        print(f"Warning: Could not create validation dataloader: {e}")
+        print("Continuing training without validation...")
+        val_loader = None
+    
+    print(f"Train samples: {len(train_loader.dataset)}")
+    if val_loader is None:
         raise RuntimeError(
             "ERROR: Validation dataloader is not available. Cannot compute validation metrics. "
             "Please check dataset configuration to ensure validation split is available."
