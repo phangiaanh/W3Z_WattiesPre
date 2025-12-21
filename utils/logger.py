@@ -36,6 +36,7 @@ class TrainingLogger:
         self.log_gradient_norm = log_gradient_norm
         self.log_learning_rate = log_learning_rate
         self.log_iteration_every = log_iteration_every
+        self.val_iteration = 0
         
         os.makedirs(log_dir, exist_ok=True)
         
@@ -171,7 +172,10 @@ class TrainingLogger:
             metrics: Dictionary of validation metrics
             iteration_time: Time taken for this iteration
         """
-        if self.global_iteration % self.log_iteration_every != 0:
+        # if self.global_iteration % self.log_iteration_every != 0:
+        #     return
+        if self.val_iteration % self.log_iteration_every != 0:
+            self.val_iteration += 1
             return
         
         row = [epoch, self.global_iteration, batch_idx, losses.get('total', 0.0)]

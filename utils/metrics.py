@@ -192,13 +192,14 @@ class Evaluator:
         self.pck_thresholds = pck_thresholds if pck_thresholds is not None else [0.1, 0.15]
         self.pck_head_threshold = pck_head_threshold
     
-    def evaluate(self, output: Dict, batch: Dict) -> Dict[str, float]:
+    def evaluate(self, output: Dict, batch: Dict, debug: bool = False) -> Dict[str, float]:
         """
         Evaluate model output and compute all metrics.
         
         Args:
             output: Model output dictionary
             batch: Input batch dictionary
+            debug: If True, print debug information about missing keys
         
         Returns:
             Dictionary with metric names and values
@@ -224,6 +225,15 @@ class Evaluator:
                     pred_kp2d, gt_kp2d, threshold=self.pck_head_threshold, 
                     mask=mask, image_size=self.image_size
                 )
+            elif debug:
+                print("  DEBUG: Skipping P@H - mask not found in batch")
+        elif debug:
+            missing = []
+            if 'pred_keypoints_2d' not in output:
+                missing.append("'pred_keypoints_2d' in output")
+            if 'keypoints_2d' not in batch:
+                missing.append("'keypoints_2d' in batch")
+            print(f"  DEBUG: Skipping 2D keypoint metrics (P@0.1, P@0.15, P@H) - missing: {', '.join(missing)}")
         
         # 3D keypoint metrics
         if 'pred_keypoints_3d' in output and 'keypoints_3d' in batch:
@@ -236,6 +246,13 @@ class Evaluator:
             
             # PAJ (PA-MPJPE)
             metrics['PAJ'] = compute_pa_mpjpe(pred_kp3d_aligned, gt_kp3d_aligned)
+        elif debug:
+            missing = []
+            if 'pred_keypoints_3d' not in output:
+                missing.append("'pred_keypoints_3d' in output")
+            if 'keypoints_3d' not in batch:
+                missing.append("'keypoints_3d' in batch")
+            print(f"  DEBUG: Skipping PAJ (3D keypoint metric) - missing: {', '.join(missing)}")
         
         # Vertex metrics
         if 'pred_vertices' in output and 'vertices' in batch:
@@ -244,6 +261,13 @@ class Evaluator:
             
             # PAV (PA-MPVPE)
             metrics['PAV'] = compute_pa_mpvpe(pred_verts, gt_verts)
+        elif debug:
+            missing = []
+            if 'pred_vertices' not in output:
+                missing.append("'pred_vertices' in output")
+            if 'vertices' not in batch:
+                missing.append("'vertices' in batch")
+            print(f"  DEBUG: Skipping PAV (vertex metric) - missing: {', '.join(missing)}")
         
         return metrics
 

@@ -132,6 +132,10 @@ class CategoryRoutedModel(nn.Module):
         # Get embed dimension from backbone
         self.embed_dim = self.backbone.embed_dim
     
+    def has_smal(self) -> bool:
+        """Check if SMAL model is loaded."""
+        return self.smal is not None
+    
     def forward(self, batch: Dict[str, Any], training: bool = True) -> Dict[str, Any]:
         """
         Forward pass through the model.

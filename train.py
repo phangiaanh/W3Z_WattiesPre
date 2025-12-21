@@ -17,7 +17,9 @@ from models.losses import CombinedLoss
 from utils.metrics import Evaluator
 from utils.logger import TrainingLogger
 from dataset import Animal3DDataset
+import gc
 
+gc.collect()
 torch.cuda.empty_cache()
 
 def setup_device(cfg):
@@ -333,6 +335,14 @@ def main(cfg: DictConfig):
     model = create_model(cfg, device)
     print(f"Model created with {sum(p.numel() for p in model.parameters())} parameters")
     
+    # Check if SMAL is loaded (required for metrics)
+    if not model.has_smal():
+        raise RuntimeError(
+            "ERROR: SMAL model is not loaded. Cannot compute keypoint/vertex metrics. "
+            "Please check model_path in configs/model/smal.yaml"
+        )
+    print("SMAL model loaded successfully.")
+    
     # Create dataloaders
     print("\nCreating dataloaders...")
     train_loader = create_dataloader(cfg, split='train')
@@ -340,6 +350,11 @@ def main(cfg: DictConfig):
     print(f"Train samples: {len(train_loader.dataset)}")
     if val_loader:
         print(f"Val samples: {len(val_loader.dataset)}")
+    else:
+        raise RuntimeError(
+            "ERROR: Validation dataloader is not available. Cannot compute validation metrics. "
+            "Please check dataset configuration to ensure validation split is available."
+        )
     
     # Create optimizer and scheduler
     optimizer = create_optimizer(model, cfg)
@@ -504,7 +519,29 @@ def main(cfg: DictConfig):
                     val_loss_total += loss.item()
                     
                     # Compute metrics
-                    metrics = evaluator.evaluate(output, batch)
+                    metrics = evaluator.evaluate(output, batch, debug=(epoch == 0 and batch_idx == 0))
+                    
+                    # Debug logging for first validation batch
+                    if epoch == 0 and batch_idx == 0:
+                        print("\n" + "=" * 50)
+                        print("=== DEBUG: Metric Computation (Epoch 0, Batch 0) ===")
+                        print("=" * 50)
+                        print(f"Output keys: {list(output.keys())}")
+                        print(f"Batch keys: {list(batch.keys())}")
+                        print(f"Computed metrics: {list(metrics.keys())}")
+                        
+                        # Check for missing keys
+                        required_output_keys = ['pred_keypoints_2d', 'pred_keypoints_3d', 'pred_vertices']
+                        required_batch_keys = ['keypoints_2d', 'keypoints_3d', 'vertices', 'mask']
+                        missing_in_output = [k for k in required_output_keys if k not in output]
+                        missing_in_batch = [k for k in required_batch_keys if k not in batch]
+                        
+                        if missing_in_output:
+                            print(f"Missing in output: {missing_in_output}")
+                        if missing_in_batch:
+                            print(f"Missing in batch: {missing_in_batch}")
+                        print("=" * 50 + "\n")
+                    
                     for k, v in metrics.items():
                         if k not in val_metrics:
                             val_metrics[k] = []
