@@ -61,8 +61,8 @@ def compute_pck(pred_keypoints_2d: torch.Tensor, gt_keypoints_2d: torch.Tensor,
     Compute PCK (Percentage of Correct Keypoints) metric.
     
     Args:
-        pred_keypoints_2d: (B, N, 2) predicted 2D keypoints
-        gt_keypoints_2d: (B, N, 3) ground truth 2D keypoints with confidence
+        pred_keypoints_2d: (B, N, 2) predicted 2D keypoints (in normalized [-0.5, 0.5] coordinates)
+        gt_keypoints_2d: (B, N, 3) ground truth 2D keypoints with confidence (in normalized [-0.5, 0.5] coordinates)
         threshold: PCK threshold (0.1, 0.15, etc.)
         normalize_by: 'image_size' or 'head_size' or 'mask'
         image_size: Image size for normalization
@@ -74,33 +74,29 @@ def compute_pck(pred_keypoints_2d: torch.Tensor, gt_keypoints_2d: torch.Tensor,
     conf = gt_keypoints_2d[:, :, -1]  # (B, N)
     gt_kp = gt_keypoints_2d[:, :, :-1]  # (B, N, 2)
     
-    # Compute distances
-    dist = torch.norm(pred_keypoints_2d - gt_kp, dim=-1)  # (B, N)
+    # Convert normalized coordinates [-0.5, 0.5] back to pixel coordinates [0, image_size]
+    # This matches AMR's approach
+    pred_keypoints_2d_pixel = (pred_keypoints_2d + 0.5) * image_size
+    gt_kp_pixel = (gt_kp + 0.5) * image_size
+    
+    # Compute distances in pixel space
+    dist = torch.norm(pred_keypoints_2d_pixel - gt_kp_pixel, dim=-1)  # (B, N)
     
     # Normalize by appropriate factor
-    if normalize_by == 'image_size':
-        norm_factor = image_size
-    elif normalize_by == 'head_size':
-        # Compute head size from mask
+    if normalize_by == 'head_size' or normalize_by == 'mask':
+        # PCK@HTH: normalize by sqrt of segmentation area (head size)
         if mask is not None:
             seg_area = torch.sum(mask.reshape(mask.shape[0], -1), dim=-1).unsqueeze(-1)  # (B, 1)
             norm_factor = torch.sqrt(seg_area)
         else:
+            # Fallback to image_size if mask not available
             norm_factor = image_size
-    elif normalize_by == 'mask':
-        if mask is not None:
-            seg_area = torch.sum(mask.reshape(mask.shape[0], -1), dim=-1).unsqueeze(-1)  # (B, 1)
-            norm_factor = torch.sqrt(seg_area)
-        else:
-            norm_factor = image_size
-    else:
-        norm_factor = image_size
-    
-    # Normalize distances
-    if isinstance(norm_factor, torch.Tensor):
         normalized_dist = dist / norm_factor
+    elif normalize_by == 'image_size':
+        # Normalize by image size
+        normalized_dist = dist / image_size
     else:
-        normalized_dist = dist / norm_factor
+        normalized_dist = dist / image_size
     
     # Compute hits
     hits = normalized_dist < threshold
@@ -120,8 +116,10 @@ def compute_pck_at_threshold(pred_keypoints_2d: torch.Tensor, gt_keypoints_2d: t
                             threshold: float, image_size: int = 256, 
                             mask: torch.Tensor = None) -> float:
     """Compute P@threshold (e.g., P@0.1, P@0.15)."""
+    # Use head-size normalization (PCK@HTH) like AMR, fallback to image_size if no mask
+    normalize_by = 'head_size' if mask is not None else 'image_size'
     pck = compute_pck(pred_keypoints_2d, gt_keypoints_2d, threshold, 
-                     normalize_by='image_size', image_size=image_size, mask=mask)
+                     normalize_by=normalize_by, image_size=image_size, mask=mask)
     return pck.mean().item()
 
 
@@ -192,14 +190,13 @@ class Evaluator:
         self.pck_thresholds = pck_thresholds if pck_thresholds is not None else [0.1, 0.15]
         self.pck_head_threshold = pck_head_threshold
     
-    def evaluate(self, output: Dict, batch: Dict, debug: bool = False) -> Dict[str, float]:
+    def evaluate(self, output: Dict, batch: Dict) -> Dict[str, float]:
         """
         Evaluate model output and compute all metrics.
         
         Args:
             output: Model output dictionary
             batch: Input batch dictionary
-            debug: If True, print debug information about missing keys
         
         Returns:
             Dictionary with metric names and values
@@ -215,6 +212,7 @@ class Evaluator:
             # PCK at configured thresholds
             for threshold in self.pck_thresholds:
                 metric_name = f'P@{threshold}'
+                # Use head-size normalization (PCK@HTH) like AMR
                 metrics[metric_name] = compute_pck_at_threshold(
                     pred_kp2d, gt_kp2d, threshold=threshold, image_size=self.image_size, mask=mask
                 )
@@ -225,15 +223,6 @@ class Evaluator:
                     pred_kp2d, gt_kp2d, threshold=self.pck_head_threshold, 
                     mask=mask, image_size=self.image_size
                 )
-            elif debug:
-                print("  DEBUG: Skipping P@H - mask not found in batch")
-        elif debug:
-            missing = []
-            if 'pred_keypoints_2d' not in output:
-                missing.append("'pred_keypoints_2d' in output")
-            if 'keypoints_2d' not in batch:
-                missing.append("'keypoints_2d' in batch")
-            print(f"  DEBUG: Skipping 2D keypoint metrics (P@0.1, P@0.15, P@H) - missing: {', '.join(missing)}")
         
         # 3D keypoint metrics
         if 'pred_keypoints_3d' in output and 'keypoints_3d' in batch:
@@ -246,13 +235,6 @@ class Evaluator:
             
             # PAJ (PA-MPJPE)
             metrics['PAJ'] = compute_pa_mpjpe(pred_kp3d_aligned, gt_kp3d_aligned)
-        elif debug:
-            missing = []
-            if 'pred_keypoints_3d' not in output:
-                missing.append("'pred_keypoints_3d' in output")
-            if 'keypoints_3d' not in batch:
-                missing.append("'keypoints_3d' in batch")
-            print(f"  DEBUG: Skipping PAJ (3D keypoint metric) - missing: {', '.join(missing)}")
         
         # Vertex metrics
         if 'pred_vertices' in output and 'vertices' in batch:
@@ -261,13 +243,6 @@ class Evaluator:
             
             # PAV (PA-MPVPE)
             metrics['PAV'] = compute_pa_mpvpe(pred_verts, gt_verts)
-        elif debug:
-            missing = []
-            if 'pred_vertices' not in output:
-                missing.append("'pred_vertices' in output")
-            if 'vertices' not in batch:
-                missing.append("'vertices' in batch")
-            print(f"  DEBUG: Skipping PAV (vertex metric) - missing: {', '.join(missing)}")
         
         return metrics
 
