@@ -77,6 +77,15 @@ class CategoryRoutedModel(nn.Module):
             else:
                 state_dict = checkpoint
             
+            # Handle pos_embed size mismatch (different image/patch sizes)
+            if 'pos_embed' in state_dict:
+                checkpoint_pos_embed = state_dict['pos_embed']
+                model_pos_embed = self.backbone.pos_embed
+                if checkpoint_pos_embed.shape != model_pos_embed.shape:
+                    print(f'Warning: pos_embed size mismatch. Checkpoint: {checkpoint_pos_embed.shape}, '
+                          f'Model: {model_pos_embed.shape}. Skipping pos_embed (will use random init).')
+                    state_dict.pop('pos_embed')
+            
             missing_keys, unexpected_keys = self.backbone.load_state_dict(state_dict, strict=False)
             if missing_keys:
                 print(f'Missing keys when loading backbone: {len(missing_keys)} keys')
