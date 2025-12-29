@@ -13,5 +13,5 @@ drop_path_rate: 0.55
 use_cls: true
 
 # Pretrained weights path (can be local path or HuggingFace relative path)
-pretrained_weights: null  # data/backbone.pth
+pretrained_weights: data/backbone.pth  # data/backbone.pth
 

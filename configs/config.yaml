@@ -28,7 +28,7 @@ huggingface:
 # Training configuration
 training:
   batch_size: 16
-  num_epochs: 50
+  num_epochs: 20
   num_workers: 4
   pin_memory: true
 
