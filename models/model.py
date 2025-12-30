@@ -176,9 +176,9 @@ class CategoryRoutedModel(nn.Module):
         gt_category = batch.get('supercategory', None)
         
         # Forward through backbone
-        # Note: Original AniMer crops image, but we'll use full image for now
-        # You can add cropping if needed: img[:, :, :, 32:-32]
-        features, cls_token = self.backbone(img)
+        # Match AniMer: crop to [256, 192] by removing 32 pixels from each side
+        img_cropped = img[:, :, :, 32:-32]  # [B, 3, 256, 192]
+        features, cls_token = self.backbone(img_cropped)
         
         # Extract CLS features
         cls_feats = self.cls_header(cls_token)

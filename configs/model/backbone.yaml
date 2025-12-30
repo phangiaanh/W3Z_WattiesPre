@@ -1,6 +1,6 @@
 # @package _global_.model.backbone
 
-img_size: [256, 256]
+img_size: [256, 192]  # Match AniMer: 256x192 (will be cropped from 256x256 input)
 patch_size: 16
 embed_dim: 1280
 depth: 32
