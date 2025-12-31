@@ -321,19 +321,16 @@ def main():
     
     # Load config
     print("Loading config...")
-    if os.path.exists(args.config):
-        cfg = OmegaConf.load(args.config)
-    else:
-        # Try with Hydra config path (relative to configs directory)
-        config_name = os.path.splitext(os.path.basename(args.config))[0]
-        try:
-            with hydra.initialize(config_path="configs", version_base=None):
-                cfg = hydra.compose(config_name=config_name)
-        except Exception as e:
-            print(f"Warning: Could not load config with Hydra: {e}")
-            print("Trying to load default config...")
-            with hydra.initialize(config_path="configs", version_base=None):
-                cfg = hydra.compose(config_name="config")
+    # Always use Hydra to properly merge defaults
+    config_name = os.path.splitext(os.path.basename(args.config))[0] if args.config else "config"
+    try:
+        with hydra.initialize(config_path="configs", version_base=None):
+            cfg = hydra.compose(config_name=config_name)
+    except Exception as e:
+        print(f"Warning: Could not load config '{config_name}' with Hydra: {e}")
+        print("Trying to load default config...")
+        with hydra.initialize(config_path="configs", version_base=None):
+            cfg = hydra.compose(config_name="config")
     
     # Setup device
     device = setup_device(cfg)
