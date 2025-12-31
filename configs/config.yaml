@@ -42,7 +42,7 @@ paths:
 checkpoint:
   save_checkpoint_every: 10  # Save checkpoint every N epochs
   save_best_model: true  # Whether to save best model
-  resume_from: null  # Path to checkpoint to resume from (optional)
+  resume_from: /content/drive/MyDrive/WattiesPre/checkpoints/latest_checkpoint.pt  # Path to checkpoint to resume from (optional)
   best_metric: val_loss  # Metric to track for best model ('val_loss' or 'val_acc')
 
 # Logging configuration
